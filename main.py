@@ -2,15 +2,96 @@ import pathlib
 from tkinter import *
 from tkinter import ttk, simpledialog, messagebox
 import os
+import json
+import ctypes
+import shutil
 from datetime import datetime
 import psutil
 import subprocess
+
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_PATH = os.path.join(APP_DIR, "local.ttf")
+
+
+def register_windows_font(font_path):
+    try:
+        if not os.path.exists(font_path):
+            return False
+
+        fonts_dir = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
+        os.makedirs(fonts_dir, exist_ok=True)
+
+        dest_path = os.path.join(fonts_dir, os.path.basename(font_path))
+        if not os.path.exists(dest_path):
+            shutil.copy2(font_path, dest_path)
+
+        if ctypes.windll.gdi32.AddFontResourceW(dest_path):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def ensure_project_font(font_path=FONT_PATH):
+    try:
+        import tkinter.font as tkfont
+        available = {name.lower() for name in tkfont.families()}
+    except Exception:
+        available = set()
+
+    family_candidates = [
+        "local",
+        os.path.splitext(os.path.basename(font_path))[0].lower() if font_path else "",
+        "tahoma",
+        "segoe ui",
+        "arial"
+    ]
+
+    for candidate in family_candidates:
+        if candidate and candidate.lower() in available:
+            return candidate
+
+    if not os.path.exists(font_path):
+        return None
+
+    if messagebox.askyesno(
+        "Проблема со шрифтом",
+        "Системный шрифт работает некорректно.\n"
+        "Установить встроенный шрифт из проекта в Windows и использовать его сразу?"
+    ):
+        if register_windows_font(font_path):
+            try:
+                import tkinter.font as tkfont
+                available = {name.lower() for name in tkfont.families()}
+                for candidate in family_candidates:
+                    if candidate and candidate.lower() in available:
+                        messagebox.showinfo("Шрифт установлен", "Встроенный шрифт успешно установлен и активирован.")
+                        return candidate
+            except Exception:
+                pass
+
+        messagebox.showerror(
+            "Шрифт не установлен",
+            "Автоматическая установка не удалась.\n"
+            "Проверьте файл local.ttf в папке проекта."
+        )
+
+    return None
+
 
 root = Tk()
 root.title("98 utility")
 root.geometry("400x300")
 root.resizable(False, False)
-root.iconbitmap("ico.ico")
+if os.path.exists("ico.ico"):
+    try:
+        root.iconbitmap("ico.ico")
+    except Exception:
+        pass
+
+custom_font_name = ensure_project_font()
+if custom_font_name:
+    root.option_add("*Font", f"{custom_font_name} 10")
 
 canvas = Canvas(root, width=400, height=300, bg="lightgray")
 canvas.pack()
@@ -29,152 +110,23 @@ Languages_dict = {
     "Nedorusskiy": "nedo"
 }
 
-Localization = {
-    "en": {
-        "select_disk": "Select a disk:",
-        "created_by": "created by lukbatun.",
-        "btn_select": "Select Disk",
-        "btn_exit": "Exit",
-        "btn_explorer": "Explorer",
-        "btn_utility": "Utilities",
-        "btn_recovery": "Recovery",
-        "btn_scanning": "Scan",
-        "btn_tasklist": "Tasks",
-        "quick_access": "Important Places",
-        "col_name": "Name",
-        "col_size": "Size",
-        "col_type": "Type",
-        "col_date": "Modified",
-        "btn_up": "Up",
-        "folder": "Folder",
-        "file": "File",
-        "loc_desktop": "Desktop",
-        "loc_docs": "Documents",
-        "loc_down": "Downloads",
-        "loc_music": "Music",
-        "loc_pics": "Pictures",
-        "loc_videos": "Videos",
-        "loc_root": "Root",
-        "loc_windows": "Windows",
-        "tab_processes": " Processes ",
-        "tab_services": " Services ",
-        "lbl_search_proc": "Search process: ",
-        "lbl_search_serv": "Search service: ",
-        "btn_kill": "Kill Process",
-        "btn_run": "Run Task",
-        "btn_toggle_crit": "Toggle Critical",
-        "col_proc_name": "Process",
-        "col_pid": "PID",
-        "col_user": "User",
-        "col_critical": "Critical",
-        "col_serv_name": "Service Name",
-        "col_serv_display": "Display Name",
-        "col_serv_status": "Status",
-        "crit_yes": "Yes",
-        "crit_no": "No",
-        "crit_removed": "Removed",
-        "btn_back": "< Back",
-        "run_title": "Run New Task",
-        "run_prompt": "Enter program name or path:",
-        "run_error": "Failed to start process:"
-    },
-    "ru": {
-        "select_disk": "Выберите диск:",
-        "created_by": "создано lukbatun.",
-        "btn_select": "Выбрать диск",
-        "btn_exit": "Выход",
-        "btn_explorer": "Проводник",
-        "btn_utility": "Утилиты",
-        "btn_recovery": "Восстановление",
-        "btn_scanning": "Сканирование",
-        "btn_tasklist": "Задачи",
-        "quick_access": "Важные места",
-        "col_name": "Имя",
-        "col_size": "Размер",
-        "col_type": "Тип",
-        "col_date": "Дата изменения",
-        "btn_up": "Наверх",
-        "folder": "Папка",
-        "file": "Файл",
-        "loc_desktop": "Рабочий стол",
-        "loc_docs": "Документы",
-        "loc_down": "Загрузки",
-        "loc_music": "Музыка",
-        "loc_pics": "Изображения",
-        "loc_videos": "Видео",
-        "loc_root": "Корень диска",
-        "loc_windows": "Windows",
-        "tab_processes": " Процессы ",
-        "tab_services": " Службы ",
-        "lbl_search_proc": "Поиск процесса: ",
-        "lbl_search_serv": "Поиск службы: ",
-        "btn_kill": "Завершить процесс",
-        "btn_run": "Запустить процесс",
-        "btn_toggle_crit": "Снять критичность",
-        "col_proc_name": "Процесс",
-        "col_pid": "PID",
-        "col_user": "Пользователь",
-        "col_critical": "Критичен",
-        "col_serv_name": "Имя службы",
-        "col_serv_display": "Отображаемое имя",
-        "col_serv_status": "Статус",
-        "crit_yes": "Да",
-        "crit_no": "Нет",
-        "crit_removed": "Снято",
-        "btn_back": "< Назад",
-        "run_title": "Запуск задачи",
-        "run_prompt": "Введите имя программы или путь к файлу:",
-        "run_error": "Не удалось запустить процесс:"
-    },
-    "nedo": {
-        "select_disk": "Vibirite disk:",
-        "created_by": "sozdano lukbatun.",
-        "btn_select": "Vibrat disk",
-        "btn_exit": "Vihod",
-        "btn_explorer": "Prowodnik",
-        "btn_utility": "Utiliti",
-        "btn_recovery": "Vosstanovlenie",
-        "btn_scanning": "Skanirovanie",
-        "btn_tasklist": "Zadachi",
-        "quick_access": "Vazhnie mesta",
-        "col_name": "Imya",
-        "col_size": "Razmer",
-        "col_type": "Tip",
-        "col_date": "Data izmeneniya",
-        "btn_up": "Naverh",
-        "folder": "Papka",
-        "file": "Fail",
-        "loc_desktop": "Rabochiy stol",
-        "loc_docs": "Dokumenti",
-        "loc_down": "Zagruzki",
-        "loc_music": "Muzika",
-        "loc_pics": "Kartinki",
-        "loc_videos": "Kino",
-        "loc_root": "Koren",
-        "loc_windows": "Vindovs",
-        "tab_processes": " Protsessi ",
-        "tab_services": " Sluzhbi ",
-        "lbl_search_proc": "Poisk protsessa: ",
-        "lbl_search_serv": "Poisk sluzhbi: ",
-        "btn_kill": "Zavershit",
-        "btn_run": "Zapustit protsess",
-        "btn_toggle_crit": "Snyat kritichnost",
-        "col_proc_name": "Protsess",
-        "col_pid": "PID",
-        "col_user": "Polzovatel",
-        "col_critical": "Kritichen",
-        "col_serv_name": "Imya sluzhbi",
-        "col_serv_display": "Imya",
-        "col_serv_status": "Status",
-        "crit_yes": "Da",
-        "crit_no": "Net",
-        "crit_removed": "Snyato",
-        "btn_back": "< Nazad",
-        "run_title": "Zapusk zadachi",
-        "run_prompt": "Vvedite imya programmi ili put:",
-        "run_error": "Ne udalos zapustit protsess:"
-    }
-}
+
+def load_localization():
+    localization_path = os.path.join(os.path.dirname(__file__), "Localization.json")
+    try:
+        with open(localization_path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+        if isinstance(data, dict) and data:
+            return data
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        pass
+
+    with open(localization_path, "w", encoding="utf-8") as file:
+        json.dump(DEFAULT_LOCALIZATION, file, ensure_ascii=False, indent=2)
+    return DEFAULT_LOCALIZATION
+
+
+Localization = load_localization()
 
 def format_size(size_bytes):
     if size_bytes < 1024:
